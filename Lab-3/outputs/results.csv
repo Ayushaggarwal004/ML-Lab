@@ -1,0 +1,4 @@
+model,parameters,test_accuracy_pct,hand_flops_per_image,thop_full_model_ops,thop_full_model_parameters,thop_full_model_error,thop_representative_layer_ops,thop_representative_layer_parameters,thop_representative_layer_error,latency_batch1_median_ms,latency_batch128_median_ms
+MLP,235146,87.95,401408,234752.0,235146,,200704.0,0,,0.09459999273531139,0.4850999976042658
+CNN,20490,89.55,225792,1031744.0,20490,,112896.0,0,,0.2298500039614737,7.395799970254302
+Attention,70794,83.84,1114112,591488.0,37514,,270336.0,16832,,0.6082500040065497,3.6060000129509717
