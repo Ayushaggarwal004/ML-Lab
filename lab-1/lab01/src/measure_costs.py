@@ -1,0 +1,201 @@
+"""Steps 3-4: system cost of both models + resource-budget fit.
+
+Measures, per model:
+  * training time        - median of 5 runs after 1 warm-up
+  * inference latency    - single sample, 100 repeats after 1 warm-up, median (+ p95)
+  * model size           - joblib.dump to results/model_<name>.joblib (bytes and KB)
+  * peak memory (RSS)    - training and inference, each in 5 fresh subprocesses, median
+
+Writes results/system_costs.csv, results/budget_fit.csv and results/summary.md.
+Run baselines.py first if you also want the accuracy table in summary.md.
+"""
+from __future__ import annotations
+
+import json
+import statistics
+import subprocess
+import sys
+import time
+
+import joblib
+import numpy as np
+import pandas as pd
+
+from common import (
+    MODEL_FACTORIES, N_INFER_RUNS, N_MEM_RUNS, N_TRAIN_RUNS, RESULTS_DIR, SRC_DIR,
+    load_split, md_table, model_path, set_seeds,
+)
+
+# ---- Budgets from the manual (1 KB = 1024 B, 1 MB = 1024 KB) -------------------------------
+# mem_max_mb is the UPPER end of each memory range: a model "fits" a tier if its peak memory is
+# at or below the most generous device of that tier. Cloud has no upper bound (">= 1 GB").
+# The lower ends (256 MB for Edge, 64 MB for Mobile) describe the device class, not a limit.
+BUDGETS = {
+    "Cloud":  {"mem_text": ">= 1 GB",     "mem_max_mb": None,       "latency_ms": 100, "size_kb": 500 * 1024},
+    "Edge":   {"mem_text": "256-1024 MB",  "mem_max_mb": 1024,       "latency_ms": 50,  "size_kb": 50 * 1024},
+    "Mobile": {"mem_text": "64-256 MB",    "mem_max_mb": 256,        "latency_ms": 20,  "size_kb": 10 * 1024},
+    "TinyML": {"mem_text": "<= 256 KB",    "mem_max_mb": 256 / 1024, "latency_ms": 10,  "size_kb": 100},
+}
+MB = 1024 ** 2
+
+
+def time_training(make, X_train, y_train) -> float:
+    make().fit(X_train, y_train)  # warm-up (not counted)
+    times = []
+    for _ in range(N_TRAIN_RUNS):
+        model = make()
+        t0 = time.perf_counter()
+        model.fit(X_train, y_train)
+        times.append(time.perf_counter() - t0)
+    return statistics.median(times)
+
+
+def time_inference(model, sample) -> tuple[float, float]:
+    model.predict(sample)  # warm-up (not counted)
+    times_ms = []
+    for _ in range(N_INFER_RUNS):
+        t0 = time.perf_counter()
+        model.predict(sample)
+        times_ms.append((time.perf_counter() - t0) * 1000)
+    return statistics.median(times_ms), float(np.percentile(times_ms, 95))
+
+
+def run_worker(name: str, phase: str) -> dict:
+    cmd = [sys.executable, str(SRC_DIR / "memory_worker.py"), name, phase]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=SRC_DIR)
+    except subprocess.CalledProcessError as err:
+        print(err.stderr)
+        raise
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def measure_memory(name: str, phase: str) -> tuple[float, float]:
+    """Median over N_MEM_RUNS fresh processes -> (peak RSS MB, growth over baseline MB)."""
+    peaks, deltas = [], []
+    for _ in range(N_MEM_RUNS):
+        out = run_worker(name, phase)
+        peaks.append(out["peak_bytes"] / MB)
+        deltas.append((out["peak_bytes"] - out["baseline_bytes"]) / MB)
+    return statistics.median(peaks), statistics.median(deltas)
+
+
+def evaluate_fit(costs: list[dict]) -> list[dict]:
+    rows = []
+    for tier, b in BUDGETS.items():
+        for c in costs:
+            limit = b["mem_max_mb"]
+            mem_total = limit is None or c["infer_peak_rss_mb"] <= limit
+            mem_model = limit is None or c["infer_peak_delta_mb"] <= limit
+            lat = c["infer_latency_median_ms"] <= b["latency_ms"]
+            size = c["model_size_kb"] <= b["size_kb"]
+            strict = mem_total and lat and size
+            model_only = mem_model and lat and size
+            failed = [n for n, ok in (("memory", mem_total), ("latency", lat), ("size", size)) if not ok]
+            if strict:
+                verdict = "fits"
+            elif model_only:
+                verdict = "fits only if the Python/scikit-learn runtime is not counted"
+            else:
+                verdict = "does not fit (" + ", ".join(failed) + ")"
+            rows.append({
+                "tier": tier, "model": c["model"],
+                "memory_budget": b["mem_text"], "latency_budget_ms": b["latency_ms"], "size_budget_kb": b["size_kb"],
+                "infer_peak_rss_mb": c["infer_peak_rss_mb"], "infer_peak_delta_mb": c["infer_peak_delta_mb"],
+                "infer_latency_median_ms": c["infer_latency_median_ms"], "model_size_kb": c["model_size_kb"],
+                "memory_ok_total": "yes" if mem_total else "no",
+                "memory_ok_model_only": "yes" if mem_model else "no",
+                "latency_ok": "yes" if lat else "no",
+                "size_ok": "yes" if size else "no",
+                "verdict": verdict,
+            })
+    return rows
+
+
+def write_summary(costs: list[dict], fit: list[dict]) -> None:
+    parts = ["# Lab 1 - measured results (auto-generated by measure_costs.py)\n"]
+
+    acc_file = RESULTS_DIR / "baseline_accuracy.csv"
+    if acc_file.exists():
+        acc = pd.read_csv(acc_file, dtype=str).to_dict("records")
+        parts += ["## Test accuracy\n", md_table(acc), ""]
+
+    cost_table = [{
+        "model": c["model"],
+        "train time, median of 5 (s)": f"{c['train_time_median_s']:.4f}",
+        "inference latency, median of 100 (ms)": f"{c['infer_latency_median_ms']:.4f}",
+        "p95 latency (ms)": f"{c['infer_latency_p95_ms']:.4f}",
+        "model size (bytes)": c["model_size_bytes"],
+        "model size (KB)": f"{c['model_size_kb']:.2f}",
+        "train peak RSS (MB)": f"{c['train_peak_rss_mb']:.1f}",
+        "train growth (MB)": f"{c['train_peak_delta_mb']:.2f}",
+        "inference peak RSS (MB)": f"{c['infer_peak_rss_mb']:.1f}",
+        "inference growth (MB)": f"{c['infer_peak_delta_mb']:.2f}",
+    } for c in costs]
+    parts += [
+        "## System cost\n", md_table(cost_table),
+        "\nPeak RSS = whole Python process (interpreter + libraries + model). "
+        "Growth = peak minus RSS just before the phase started, i.e. what the phase itself added. "
+        "1 KB = 1024 bytes, 1 MB = 1024 KB.\n",
+    ]
+
+    fit_table = []
+    for r in fit:
+        fit_table.append({
+            "tier": r["tier"], "model": r["model"],
+            "memory (budget -> total / growth)": f"{r['memory_budget']} -> {r['infer_peak_rss_mb']:.1f} MB ({r['memory_ok_total']}) / {r['infer_peak_delta_mb']:.2f} MB ({r['memory_ok_model_only']})",
+            "latency (budget -> measured)": f"<= {r['latency_budget_ms']} ms -> {r['infer_latency_median_ms']:.4f} ms ({r['latency_ok']})",
+            "size (budget -> measured)": f"<= {r['size_budget_kb']} KB -> {r['model_size_kb']:.2f} KB ({r['size_ok']})",
+            "verdict": r["verdict"],
+        })
+    parts += ["## Deployment fit\n", md_table(fit_table), ""]
+
+    (RESULTS_DIR / "summary.md").write_text("\n".join(parts), encoding="utf-8")
+
+
+def main() -> None:
+    set_seeds()
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    X_train, X_test, y_train, _ = load_split()
+    sample = X_test[:1]
+
+    costs = []
+    for name, make in MODEL_FACTORIES.items():
+        print(f"== {name}")
+        model = make().fit(X_train, y_train)
+        path = model_path(name)
+        joblib.dump(model, path)
+        size_bytes = path.stat().st_size
+
+        print("   timing training ...")
+        train_s = time_training(make, X_train, y_train)
+        print("   timing single-sample inference ...")
+        lat_med, lat_p95 = time_inference(model, sample)
+        print(f"   peak memory ({N_MEM_RUNS} fresh processes per phase) ...")
+        train_rss, train_delta = measure_memory(name, "train")
+        infer_rss, infer_delta = measure_memory(name, "infer")
+
+        costs.append({
+            "model": name,
+            "train_time_median_s": round(train_s, 4),
+            "infer_latency_median_ms": round(lat_med, 4),
+            "infer_latency_p95_ms": round(lat_p95, 4),
+            "model_size_bytes": size_bytes,
+            "model_size_kb": round(size_bytes / 1024, 2),
+            "train_peak_rss_mb": round(train_rss, 1),
+            "train_peak_delta_mb": round(train_delta, 2),
+            "infer_peak_rss_mb": round(infer_rss, 1),
+            "infer_peak_delta_mb": round(infer_delta, 2),
+        })
+
+    fit = evaluate_fit(costs)
+    pd.DataFrame(costs).to_csv(RESULTS_DIR / "system_costs.csv", index=False)
+    pd.DataFrame(fit).to_csv(RESULTS_DIR / "budget_fit.csv", index=False)
+    write_summary(costs, fit)
+
+    print("\n" + (RESULTS_DIR / "summary.md").read_text(encoding="utf-8"))
+    print(f"Saved results to {RESULTS_DIR}")
+
+
+if __name__ == "__main__":
+    main()
