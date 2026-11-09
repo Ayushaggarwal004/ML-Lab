@@ -1,0 +1,195 @@
+{
+  "task4": {
+    "task_expression": {
+      "forward_value_engine": 41.733962962998184,
+      "forward_value_torch": 41.733962962998184,
+      "max_abs_diff_vs_pytorch": 0.0,
+      "max_abs_diff_vs_numerical": 3.1067961536734856e-09,
+      "pass": true
+    },
+    "extra_relu_branch_check": {
+      "forward_value_engine": 31.28735982158628,
+      "forward_value_torch": 31.28735982158628,
+      "max_abs_diff_vs_pytorch": 0.0,
+      "max_abs_diff_vs_numerical": 3.8944243385685695e-09,
+      "pass": true
+    },
+    "accumulation_check_x*x+x_at_3": {
+      "grad": 7.0,
+      "expected": 7.0,
+      "pass": true
+    }
+  },
+  "task5": {
+    "samples": 200,
+    "epochs": 100,
+    "lr": 0.5,
+    "architecture": "2 -> 8 (ReLU) -> 1 (sigmoid), BCE loss",
+    "graph_nodes_per_backward": 10835,
+    "engine": {
+      "median_s": 10.74985870020464,
+      "runs_s": [
+        9.370679500047117,
+        10.359862899873406,
+        10.834029899910092,
+        10.74985870020464,
+        10.899665299803019
+      ],
+      "final_loss": 0.2927679819000296,
+      "accuracy": 0.855,
+      "loss_first_epoch": 0.65718561054948,
+      "loss_last_epoch": 0.29288864641765566
+    },
+    "pytorch": {
+      "median_s": 0.03996230009943247,
+      "runs_s": [
+        1.669214399997145,
+        0.07393170008435845,
+        0.03837880026549101,
+        0.03996230009943247,
+        0.03736809967085719
+      ],
+      "final_loss": 0.2927679819000296,
+      "accuracy": 0.855,
+      "loss_first_epoch": 0.6571856105494799,
+      "loss_last_epoch": 0.29288864641765566
+    },
+    "max_abs_loss_history_diff": 1.1102230246251565e-16,
+    "speedup_pytorch_over_engine": 268.99999933580665
+  },
+  "task6": {
+    "compile_status": {
+      "torch.compile": "worked with torch.compile(aot_eager)",
+      "torch.compile(inductor)": "failed: InductorError: InvalidCxxCompiler: Compiler: cl is not found."
+    },
+    "first_call_s": {
+      "torch.compile(aot_eager)": 0.21658779960125685,
+      "jit.trace": 0.001003500074148178
+    },
+    "timings": [
+      {
+        "mode": "eager",
+        "batch": 64,
+        "pass": "forward (no_grad)",
+        "median_us": 34.90266700585683,
+        "speedup_vs_eager": 1.0
+      },
+      {
+        "mode": "eager",
+        "batch": 64,
+        "pass": "forward+backward",
+        "median_us": 262.0099997147918,
+        "speedup_vs_eager": 1.0
+      },
+      {
+        "mode": "jit.trace",
+        "batch": 64,
+        "pass": "forward (no_grad)",
+        "median_us": 40.0326664869984,
+        "speedup_vs_eager": 0.8718546644199264
+      },
+      {
+        "mode": "jit.trace",
+        "batch": 64,
+        "pass": "forward+backward",
+        "median_us": 262.8790012871226,
+        "speedup_vs_eager": 0.9966942906505427
+      },
+      {
+        "mode": "torch.compile(aot_eager)",
+        "batch": 64,
+        "pass": "forward (no_grad)",
+        "median_us": 97.55433381845553,
+        "speedup_vs_eager": 0.3577766936608804
+      },
+      {
+        "mode": "torch.compile(aot_eager)",
+        "batch": 64,
+        "pass": "forward+backward",
+        "median_us": 494.8073346167802,
+        "speedup_vs_eager": 0.5295192317990072
+      },
+      {
+        "mode": "eager",
+        "batch": 65536,
+        "pass": "forward (no_grad)",
+        "median_us": 902.7933391431967,
+        "speedup_vs_eager": 1.0
+      },
+      {
+        "mode": "eager",
+        "batch": 65536,
+        "pass": "forward+backward",
+        "median_us": 2242.9066710174084,
+        "speedup_vs_eager": 1.0
+      },
+      {
+        "mode": "jit.trace",
+        "batch": 65536,
+        "pass": "forward (no_grad)",
+        "median_us": 947.0200010885794,
+        "speedup_vs_eager": 0.9532991257897984
+      },
+      {
+        "mode": "jit.trace",
+        "batch": 65536,
+        "pass": "forward+backward",
+        "median_us": 2214.4199969867864,
+        "speedup_vs_eager": 1.0128641694300922
+      },
+      {
+        "mode": "torch.compile(aot_eager)",
+        "batch": 65536,
+        "pass": "forward (no_grad)",
+        "median_us": 1033.61999305586,
+        "speedup_vs_eager": 0.873428673214922
+      },
+      {
+        "mode": "torch.compile(aot_eager)",
+        "batch": 65536,
+        "pass": "forward+backward",
+        "median_us": 2631.310001015663,
+        "speedup_vs_eager": 0.8523916490841693
+      }
+    ],
+    "non_contiguous": [
+      {
+        "operation": "transpose view: t + 1",
+        "contiguous_us": 1695.059984922409,
+        "non_contiguous_us": 1911.5999806672335,
+        "slowdown": 1.1277476889732232
+      },
+      {
+        "operation": "transpose view: t.relu()",
+        "contiguous_us": 1742.5799742341042,
+        "non_contiguous_us": 1825.279975309968,
+        "slowdown": 1.047458367649503
+      },
+      {
+        "operation": "transpose view: t.sum(dim=1)",
+        "contiguous_us": 202.50999368727207,
+        "non_contiguous_us": 840.3200190514326,
+        "slowdown": 4.149523703749182
+      },
+      {
+        "operation": "transpose view: t @ w",
+        "contiguous_us": 2329.7599982470274,
+        "non_contiguous_us": 4349.859990179539,
+        "slowdown": 1.867085018822749
+      },
+      {
+        "operation": "strided slice a[:, ::2]: t * 2",
+        "contiguous_us": 225.43002851307392,
+        "non_contiguous_us": 868.2999759912491,
+        "slowdown": 3.85174939522705
+      },
+      {
+        "operation": "model forward on (65536,2) input",
+        "contiguous_us": 939.8633303741614,
+        "non_contiguous_us": 1026.3066738843918,
+        "slowdown": 1.0919743761849046
+      }
+    ],
+    "contiguous_copy_us": 7132.280012592673
+  }
+}

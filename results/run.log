@@ -1,0 +1,34 @@
+21:34:45 | INFO    | TASK4 task_expression                  {'forward_value_engine': 41.733962962998184, 'forward_value_torch': 41.733962962998184, 'max_abs_diff_vs_pytorch': 0.0, 'max_abs_diff_vs_numerical': 3.1067961536734856e-09, 'pass': True}
+21:34:45 | INFO    | TASK4 extra_relu_branch_check          {'forward_value_engine': 31.28735982158628, 'forward_value_torch': 31.28735982158628, 'max_abs_diff_vs_pytorch': 0.0, 'max_abs_diff_vs_numerical': 3.8944243385685695e-09, 'pass': True}
+21:34:45 | INFO    | TASK4 accumulation_check_x*x+x_at_3    {'grad': 7.0, 'expected': 7.0, 'pass': True}
+21:34:56 | INFO    | TASK5 run 1/5  engine=9.371s  pytorch=1.6692s
+21:35:06 | INFO    | TASK5 run 2/5  engine=10.360s  pytorch=0.0739s
+21:35:17 | INFO    | TASK5 run 3/5  engine=10.834s  pytorch=0.0384s
+21:35:28 | INFO    | TASK5 run 4/5  engine=10.750s  pytorch=0.0400s
+21:35:39 | INFO    | TASK5 run 5/5  engine=10.900s  pytorch=0.0374s
+21:35:39 | INFO    | TASK5 engine : loss 0.6572 -> 0.2929  acc=0.855  median=10.750s
+21:35:39 | INFO    | TASK5 pytorch: loss 0.6572 -> 0.2929  acc=0.855  median=0.0400s
+21:35:39 | INFO    | TASK5 loss-history max |diff| = 1.11e-16 | PyTorch is 269x faster
+21:35:39 | INFO    | TASK6 graph root: SigmoidBackward0
+21:35:42 | WARNING | TASK6 torch.compile(inductor) failed (InductorError)
+21:35:42 | INFO    | TASK6 compile status: {'torch.compile': 'worked with torch.compile(aot_eager)', 'torch.compile(inductor)': 'failed: InductorError: InvalidCxxCompiler: Compiler: cl is not found.'}
+21:35:47 | INFO    | TASK6 eager                      batch=64     forward (no_grad)        34.9 us  x1.00 vs eager
+21:35:47 | INFO    | TASK6 eager                      batch=64     forward+backward        262.0 us  x1.00 vs eager
+21:35:47 | INFO    | TASK6 jit.trace                  batch=64     forward (no_grad)        40.0 us  x0.87 vs eager
+21:35:47 | INFO    | TASK6 jit.trace                  batch=64     forward+backward        262.9 us  x1.00 vs eager
+21:35:47 | INFO    | TASK6 torch.compile(aot_eager)   batch=64     forward (no_grad)        97.6 us  x0.36 vs eager
+21:35:47 | INFO    | TASK6 torch.compile(aot_eager)   batch=64     forward+backward        494.8 us  x0.53 vs eager
+21:35:47 | INFO    | TASK6 eager                      batch=65536  forward (no_grad)       902.8 us  x1.00 vs eager
+21:35:47 | INFO    | TASK6 eager                      batch=65536  forward+backward       2242.9 us  x1.00 vs eager
+21:35:47 | INFO    | TASK6 jit.trace                  batch=65536  forward (no_grad)       947.0 us  x0.95 vs eager
+21:35:47 | INFO    | TASK6 jit.trace                  batch=65536  forward+backward       2214.4 us  x1.01 vs eager
+21:35:47 | INFO    | TASK6 torch.compile(aot_eager)   batch=65536  forward (no_grad)      1033.6 us  x0.87 vs eager
+21:35:47 | INFO    | TASK6 torch.compile(aot_eager)   batch=65536  forward+backward       2631.3 us  x0.85 vs eager
+21:35:48 | INFO    | TASK6 transpose view: t + 1              contiguous=     1695 us  non-contig=     1912 us  slowdown x1.13
+21:35:48 | INFO    | TASK6 transpose view: t.relu()           contiguous=     1743 us  non-contig=     1825 us  slowdown x1.05
+21:35:48 | INFO    | TASK6 transpose view: t.sum(dim=1)       contiguous=      203 us  non-contig=      840 us  slowdown x4.15
+21:35:48 | INFO    | TASK6 transpose view: t @ w              contiguous=     2330 us  non-contig=     4350 us  slowdown x1.87
+21:35:48 | INFO    | TASK6 strided slice a[:, ::2]: t * 2     contiguous=      225 us  non-contig=      868 us  slowdown x3.85
+21:35:49 | INFO    | TASK6 cost of at.contiguous() copy itself: 7132 us
+21:35:49 | INFO    | TASK6 model forward  contiguous=940 us  non-contig=1026 us  slowdown x1.09
+21:35:49 | INFO    | DONE  -> C:\Users\Ammy\Downloads\files (1)\lab5\lab5\results\report.md
